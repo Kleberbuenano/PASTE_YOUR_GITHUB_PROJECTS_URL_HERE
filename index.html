@@ -1,1 +1,388 @@
-The requested file reference is not currently visible. Use files.search or files.list to rediscover the file, then retry with a returned ref_id or file_id.
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#07101e"/>
+<title>MK Football Vision — IA MVP</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<style>
+:root{
+  --bg:#07101e;--panel:#0d1728;--panel2:#111d31;--text:#f4f7fb;--muted:#93a4bb;
+  --green1:#34b955;--green2:#2b9e49;--green3:#217c3a;--accent:#7c5cff;--pink:#ff4dc6;
+  --detect:#ffd54a;--ball:#ffffff;
+}
+*{box-sizing:border-box}
+html,body{min-height:100%;margin:0;background:
+radial-gradient(circle at 10% 0%,rgba(124,92,255,.17),transparent 32%),
+linear-gradient(180deg,#07101e,#040911 70%);color:var(--text);
+font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+.app{max-width:1600px;margin:auto;padding:14px}
+.topbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:11px 12px;
+background:rgba(13,23,40,.92);border:1px solid rgba(255,255,255,.08);border-radius:17px;
+box-shadow:0 20px 60px rgba(0,0,0,.25);position:sticky;top:6px;z-index:40;backdrop-filter:blur(10px)}
+.brand{font-weight:950;letter-spacing:.2px;margin-right:auto}.brand span{color:#9c86ff}
+.status{display:flex;align-items:center;gap:7px;font-size:12px;color:#b9c4d3}
+.dot{width:9px;height:9px;border-radius:99px;background:#5d6a7c}
+.dot.on{background:#48df82;box-shadow:0 0 0 4px rgba(72,223,130,.12),0 0 14px rgba(72,223,130,.6)}
+button,.fileLabel{border:1px solid rgba(255,255,255,.12);background:#16243a;color:#fff;
+padding:9px 11px;border-radius:11px;font-weight:800;cursor:pointer;font-size:12px}
+button.primary{background:linear-gradient(135deg,#6f52ff,#985cff);border:0}
+button.ai{background:linear-gradient(135deg,#e73aa8,#ff64d4);border:0}
+button.warn{background:#3a2d16;border-color:#675328}
+button:disabled{opacity:.45;cursor:not-allowed}
+input[type=file]{display:none}
+.grid{display:grid;grid-template-columns:minmax(380px,.9fr) minmax(600px,1.35fr);gap:13px;margin-top:13px}
+.card{background:linear-gradient(180deg,rgba(18,31,53,.97),rgba(8,16,30,.97));
+border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:13px;
+box-shadow:0 22px 70px rgba(0,0,0,.3)}
+.title{font-size:12px;color:#aab8cc;text-transform:uppercase;letter-spacing:1.2px;font-weight:900;margin:2px 0 9px}
+.cameraStage{aspect-ratio:16/9;position:relative;border-radius:15px;overflow:hidden;background:#02050a;
+border:1px solid rgba(255,255,255,.08)}
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+#overlay{position:absolute;inset:0;width:100%;height:100%;z-index:3;touch-action:none}
+.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:#8292aa;padding:20px;z-index:2;pointer-events:none}
+.empty.hidden{display:none}
+.badge{position:absolute;top:10px;left:10px;z-index:5;padding:6px 8px;border-radius:9px;background:rgba(4,9,17,.74);
+font-size:11px;font-weight:900;border:1px solid rgba(255,255,255,.1)}
+.calibHint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:6;
+background:rgba(5,10,18,.84);border:1px solid rgba(255,213,74,.38);padding:7px 10px;border-radius:10px;
+font-size:11px;color:#ffe58b;display:none;max-width:90%;text-align:center}
+.info{margin-top:9px;padding:9px 11px;border:1px solid rgba(255,255,255,.06);
+background:rgba(255,255,255,.035);border-radius:12px;font-size:12px;color:#9fb0c7;line-height:1.45}
+.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:9px}
+.metric{padding:10px;border-radius:13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
+.metric strong{font-size:20px;display:block}.metric span{font-size:10px;letter-spacing:.7px;color:#8fa0b8;text-transform:uppercase}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:9px;color:#91a2b8;font-size:11px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.pitchFrame{position:relative;aspect-ratio:16/7.2;border-radius:17px;overflow:hidden;background:#243047}
+.stadium{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(255,255,255,.11),transparent 50%),
+linear-gradient(180deg,#2c374b 0 14%,#0a111e 14%)}
+.field{position:absolute;left:4%;right:4%;top:11%;bottom:5%;clip-path:polygon(6% 0,94% 0,100% 100%,0 100%);
+background:
+linear-gradient(90deg,rgba(255,255,255,.035) 0 8.33%,transparent 8.33% 16.66%,rgba(255,255,255,.035) 16.66% 25%,transparent 25% 33.33%,rgba(255,255,255,.035) 33.33% 41.66%,transparent 41.66% 50%,rgba(255,255,255,.035) 50% 58.33%,transparent 58.33% 66.66%,rgba(255,255,255,.035) 66.66% 75%,transparent 75% 83.33%,rgba(255,255,255,.035) 83.33% 91.66%,transparent 91.66%),
+linear-gradient(180deg,var(--green1),var(--green2) 58%,var(--green3));
+box-shadow:inset 0 0 40px rgba(0,0,0,.25),0 18px 45px rgba(0,0,0,.45)}
+.mark{position:absolute;border:2px solid rgba(220,249,255,.72);pointer-events:none}
+.touch{inset:4% 3.5%;clip-path:polygon(5% 0,95% 0,100% 100%,0 100%)}
+.half{left:50%;top:4%;bottom:4%;width:0;border-left:2px solid rgba(220,249,255,.72)}
+.circle{left:50%;top:50%;width:13%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%)}
+.boxL{left:3.5%;top:24%;width:21%;height:52%}.boxR{right:3.5%;top:24%;width:21%;height:52%}
+.sixL{left:3.5%;top:35%;width:9%;height:30%}.sixR{right:3.5%;top:35%;width:9%;height:30%}
+.goalL{left:1.2%;top:41%;width:2.4%;height:18%}.goalR{right:1.2%;top:41%;width:2.4%;height:18%}
+.tPlayer{position:absolute;width:20px;height:20px;border-radius:50%;transform:translate(-50%,-50%);
+background:var(--detect);border:3px solid white;z-index:8;box-shadow:0 5px 11px rgba(0,0,0,.4);
+transition:left .15s linear,top .15s linear}
+.tPlayer::after{content:attr(data-id);position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+font-size:7px;color:#141414;font-weight:950}
+.tBall{position:absolute;width:14px;height:14px;border-radius:50%;transform:translate(-50%,-50%);
+background:white;border:3px solid #202738;z-index:9;display:none;box-shadow:0 5px 10px rgba(0,0,0,.4)}
+.panel{margin-top:11px;padding:12px;border-radius:15px;background:#050b17;border:1px solid rgba(255,255,255,.07)}
+.panel h3{margin:0 0 8px;font-size:12px;letter-spacing:1.3px;text-align:center}
+.row{display:grid;grid-template-columns:1fr auto;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px}
+.row:last-child{border-bottom:0}.value{font-weight:900;color:#d9e4f3}
+.progress{height:7px;border-radius:99px;background:#17253b;overflow:hidden;margin-top:10px}.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,#7658ff,#ff4dc6)}
+.notice{font-size:11px;color:#7f90a7;margin-top:9px;line-height:1.45}
+@media(max-width:980px){.grid{grid-template-columns:1fr}.pitchFrame{aspect-ratio:16/8}}
+@media(max-width:650px){.app{padding:8px}.topbar{top:3px}.brand{width:100%;margin-bottom:2px}
+.grid{margin-top:8px}.card{padding:9px;border-radius:15px}.pitchFrame{aspect-ratio:16/9.5}
+button,.fileLabel{padding:8px 9px}.tPlayer{width:16px;height:16px;border-width:2px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">MK <span>Football Vision</span> <small style="color:#75849a">IA MVP</small></div>
+    <div class="status"><span class="dot" id="liveDot"></span><span id="statusText">Aguardando câmera</span></div>
+    <button class="primary" id="cameraBtn">📷 Iniciar câmera</button>
+    <button id="switchBtn">🔄 Trocar</button>
+    <button class="ai" id="aiBtn" disabled>🧠 Ativar IA</button>
+    <button class="warn" id="calibBtn">📐 Calibrar campo</button>
+    <button id="stopBtn">⏹ Parar</button>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <div class="title">Câmera + detecção real</div>
+      <div class="cameraStage" id="cameraStage">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="overlay"></canvas>
+        <div class="badge" id="modelBadge">IA: carregando modelo…</div>
+        <div class="calibHint" id="calibHint">Toque nos 4 cantos do campo nesta ordem: superior esquerdo → superior direito → inferior direito → inferior esquerdo.</div>
+        <div class="empty" id="empty">
+          <div><div style="font-size:40px;margin-bottom:6px">⚽</div>
+          Toque em <b>Iniciar câmera</b> e aponte para o campo.<br>
+          <span style="font-size:11px">Depois ative a IA para detectar pessoas.</span></div>
+        </div>
+      </div>
+      <div class="info" id="cameraInfo">Câmera parada. O modelo de visão será carregado pela internet.</div>
+      <div class="metrics">
+        <div class="metric"><strong id="peopleCount">0</strong><span>Pessoas detectadas</span></div>
+        <div class="metric"><strong id="analysisFps">0.0</strong><span>FPS da IA</span></div>
+        <div class="metric"><strong id="ballDetected">Não</strong><span>Bola detectada</span></div>
+        <div class="metric"><strong id="calibState">Não</strong><span>Campo calibrado</span></div>
+      </div>
+      <div class="legend">
+        <span><i style="background:#ffd54a"></i>Jogadores/pessoas detectadas</span>
+        <span><i style="background:#fff;border:1px solid #777"></i>Bola</span>
+      </div>
+      <div class="notice">
+        Este MVP usa COCO-SSD no navegador. Ele detecta a classe “person”; em uma arquibancada pode confundir espectadores com jogadores.
+        A calibração do campo melhora a posição dos pontos no mapa tático.
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="title">Campo tático sincronizado com a câmera</div>
+      <div class="pitchFrame">
+        <div class="stadium"></div>
+        <div class="field" id="field">
+          <div class="mark touch"></div><div class="mark half"></div><div class="mark circle"></div>
+          <div class="mark boxL"></div><div class="mark boxR"></div><div class="mark sixL"></div><div class="mark sixR"></div>
+          <div class="mark goalL"></div><div class="mark goalR"></div>
+          <div class="tBall" id="tBall"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>ANÁLISE EM TEMPO REAL</h3>
+        <div class="row"><span>Modelo</span><span class="value">COCO-SSD / MobileNet</span></div>
+        <div class="row"><span>Rastreamento</span><span class="value">Centroid ID</span></div>
+        <div class="row"><span>Mapeamento</span><span class="value" id="mapMode">Aproximado</span></div>
+        <div class="row"><span>Última inferência</span><span class="value" id="latency">—</span></div>
+        <div class="progress"><i id="confidenceBar"></i></div>
+        <div class="notice" id="analysisNote">Aguardando câmera e IA.</div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('overlay');
+const ctx = canvas.getContext('2d');
+const field = document.getElementById('field');
+const tBall = document.getElementById('tBall');
+
+let stream=null, facing='environment', model=null, modelReady=false, aiRunning=false;
+let inferBusy=false, inferTimer=null, calibrationMode=false, calibPts=[], H=null;
+let tracks=[], nextTrackId=1, fieldEls=new Map(), lastInferenceAt=0;
+
+const $ = id => document.getElementById(id);
+
+function setStatus(text,on=false){$('statusText').textContent=text;$('liveDot').classList.toggle('on',on)}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function resizeCanvas(){
+  const w = video.videoWidth || 1280, h = video.videoHeight || 720;
+  if(canvas.width!==w || canvas.height!==h){canvas.width=w;canvas.height=h}
+}
+async function loadModel(){
+  try{
+    $('modelBadge').textContent='IA: carregando modelo…';
+    await tf.ready();
+    model = await cocoSsd.load({base:'lite_mobilenet_v2'});
+    modelReady=true;
+    $('modelBadge').textContent='IA: pronta';
+    $('aiBtn').disabled=false;
+  }catch(e){
+    console.error(e);
+    $('modelBadge').textContent='IA: erro ao carregar';
+    $('cameraInfo').textContent='Não foi possível carregar o modelo de IA. Verifique a conexão com a internet.';
+  }
+}
+loadModel();
+
+async function startCamera(){
+  try{
+    if(!navigator.mediaDevices?.getUserMedia) throw new Error('getUserMedia indisponível');
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+    stream=await navigator.mediaDevices.getUserMedia({
+      audio:false,video:{facingMode:{ideal:facing},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30}}
+    });
+    video.srcObject=stream; await video.play(); resizeCanvas();
+    $('empty').classList.add('hidden');
+    const s=stream.getVideoTracks()[0].getSettings?.()||{};
+    $('cameraInfo').textContent=`Câmera ${facing==='environment'?'traseira':'frontal'} ativa${s.width?` • ${s.width}×${s.height}`:''}${s.frameRate?` • ${Math.round(s.frameRate)} fps`:''}.`;
+    setStatus('Câmera ao vivo',true);
+    $('cameraBtn').textContent='📷 Reiniciar câmera';
+  }catch(e){
+    console.error(e);
+    let msg='Não foi possível abrir a câmera.';
+    if(e.name==='NotAllowedError') msg='Permissão da câmera negada. Libere a câmera para este site no navegador.';
+    else if(e.name==='NotFoundError') msg='Nenhuma câmera foi encontrada.';
+    else if(e.name==='NotReadableError') msg='A câmera pode estar sendo usada por outro aplicativo.';
+    $('cameraInfo').textContent=msg; setStatus('Câmera indisponível',false); alert(msg);
+  }
+}
+function stopAll(){
+  aiRunning=false; clearInterval(inferTimer); inferTimer=null; $('aiBtn').textContent='🧠 Ativar IA';
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+  video.srcObject=null; ctx.clearRect(0,0,canvas.width,canvas.height); clearFieldMarkers();
+  $('empty').classList.remove('hidden'); setStatus('Parado',false);
+  $('cameraInfo').textContent='Câmera parada.'; $('peopleCount').textContent='0'; $('analysisFps').textContent='0.0';
+  $('ballDetected').textContent='Não'; tBall.style.display='none';
+}
+$('cameraBtn').onclick=startCamera;
+$('switchBtn').onclick=async()=>{facing=facing==='environment'?'user':'environment';await startCamera()};
+$('stopBtn').onclick=stopAll;
+
+$('aiBtn').onclick=()=>{
+  if(!stream){alert('Inicie a câmera primeiro.');return}
+  if(!modelReady){alert('O modelo de IA ainda está carregando.');return}
+  aiRunning=!aiRunning;
+  if(aiRunning){
+    $('aiBtn').textContent='⏸ Pausar IA'; setStatus('IA analisando',true);
+    inferLoop(); inferTimer=setInterval(inferLoop,260);
+  }else{
+    $('aiBtn').textContent='🧠 Ativar IA'; clearInterval(inferTimer); inferTimer=null;
+    setStatus('Câmera ao vivo',true);
+  }
+};
+
+function clearFieldMarkers(){
+  for(const el of fieldEls.values()) el.remove();
+  fieldEls.clear(); tracks=[]; nextTrackId=1;
+}
+function assignTracks(persons){
+  const now=performance.now(), vw=video.videoWidth||1, vh=video.videoHeight||1;
+  const unmatched=new Set(tracks.map((_,i)=>i));
+  const assigned=[];
+  for(const p of persons){
+    const [x,y,w,h]=p.bbox; const nx=(x+w/2)/vw, ny=(y+h)/vh;
+    let best=-1,bestD=Infinity;
+    for(const i of unmatched){
+      const t=tracks[i]; const d=Math.hypot(nx-t.nx,ny-t.ny);
+      if(d<bestD){bestD=d;best=i}
+    }
+    let t;
+    if(best>=0 && bestD<0.14){
+      t=tracks[best]; unmatched.delete(best);
+      t.nx=nx;t.ny=ny;t.last=now;t.score=p.score;t.bbox=p.bbox;
+    }else{
+      t={id:nextTrackId++,nx,ny,last:now,score:p.score,bbox:p.bbox};
+      tracks.push(t);
+    }
+    assigned.push(t);
+  }
+  tracks=tracks.filter(t=>now-t.last<1200);
+  return assigned;
+}
+function getFieldEl(id){
+  if(fieldEls.has(id)) return fieldEls.get(id);
+  const el=document.createElement('div');el.className='tPlayer';el.dataset.id=id;field.appendChild(el);fieldEls.set(id,el);return el;
+}
+function cleanupField(visibleIds){
+  for(const [id,el] of fieldEls){
+    if(!visibleIds.has(id)){el.remove();fieldEls.delete(id)}
+  }
+}
+function mapPoint(x,y){
+  const vw=video.videoWidth||1,vh=video.videoHeight||1;
+  if(H){
+    const d=H[6]*x+H[7]*y+1;
+    return [clamp((H[0]*x+H[1]*y+H[2])/d,0,100),clamp((H[3]*x+H[4]*y+H[5])/d,0,100)];
+  }
+  return [clamp(x/vw*100,0,100),clamp(y/vh*100,0,100)];
+}
+function renderField(assigned,ballPred){
+  const visible=new Set();
+  for(const t of assigned){
+    const [x,y,w,h]=t.bbox; const [fx,fy]=mapPoint(x+w/2,y+h);
+    const el=getFieldEl(t.id); visible.add(t.id); el.style.left=fx+'%';el.style.top=fy+'%';
+  }
+  cleanupField(visible);
+  if(ballPred){
+    const [x,y,w,h]=ballPred.bbox; const [fx,fy]=mapPoint(x+w/2,y+h/2);
+    tBall.style.display='block';tBall.style.left=fx+'%';tBall.style.top=fy+'%';
+  }else tBall.style.display='none';
+}
+function drawDetections(persons,assigned,ballPred){
+  resizeCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.lineWidth=Math.max(2,canvas.width/500);ctx.font=`${Math.max(14,canvas.width/70)}px system-ui`;
+  persons.forEach((p,i)=>{
+    const [x,y,w,h]=p.bbox; const t=assigned[i];
+    ctx.strokeStyle='#ffd54a';ctx.fillStyle='rgba(255,213,74,.13)';ctx.strokeRect(x,y,w,h);ctx.fillRect(x,y,w,h);
+    const label=`J${t?.id||'?'} ${Math.round(p.score*100)}%`;
+    const tw=ctx.measureText(label).width+12, th=Math.max(22,canvas.height/28);
+    ctx.fillStyle='rgba(4,9,17,.82)';ctx.fillRect(x,Math.max(0,y-th),tw,th);
+    ctx.fillStyle='#ffe27a';ctx.fillText(label,x+6,Math.max(16,y-6));
+  });
+  if(ballPred){
+    const [x,y,w,h]=ballPred.bbox;ctx.strokeStyle='#fff';ctx.strokeRect(x,y,w,h);
+    ctx.fillStyle='rgba(255,255,255,.12)';ctx.fillRect(x,y,w,h);
+  }
+  drawCalibration();
+}
+async function inferLoop(){
+  if(!aiRunning||inferBusy||video.readyState<2||!model)return;
+  inferBusy=true; const start=performance.now();
+  try{
+    const preds=await model.detect(video,35,0.38);
+    const persons=preds.filter(p=>p.class==='person'&&p.score>=0.42);
+    const balls=preds.filter(p=>p.class==='sports ball'&&p.score>=0.28).sort((a,b)=>b.score-a.score);
+    const assigned=assignTracks(persons), ballPred=balls[0]||null;
+    drawDetections(persons,assigned,ballPred);renderField(assigned,ballPred);
+    const dt=performance.now()-start;
+    $('peopleCount').textContent=persons.length;
+    $('analysisFps').textContent=(1000/dt).toFixed(1);
+    $('ballDetected').textContent=ballPred?'Sim':'Não';
+    $('latency').textContent=Math.round(dt)+' ms';
+    $('confidenceBar').style.width=(persons.length?Math.round(persons.reduce((a,p)=>a+p.score,0)/persons.length*100):0)+'%';
+    $('analysisNote').textContent=persons.length?`${persons.length} pessoa(s) detectada(s) e sincronizada(s) com o campo tático.`:'Nenhuma pessoa detectada neste quadro.';
+    lastInferenceAt=performance.now();
+  }catch(e){console.error(e);$('analysisNote').textContent='Erro durante a inferência: '+e.message}
+  finally{inferBusy=false}
+}
+
+function solveLinear(A,b){
+  const n=b.length,M=A.map((r,i)=>r.slice().concat(b[i]));
+  for(let i=0;i<n;i++){
+    let max=i;for(let k=i+1;k<n;k++)if(Math.abs(M[k][i])>Math.abs(M[max][i]))max=k;
+    [M[i],M[max]]=[M[max],M[i]];
+    const piv=M[i][i];if(Math.abs(piv)<1e-10)return null;
+    for(let j=i;j<=n;j++)M[i][j]/=piv;
+    for(let k=0;k<n;k++)if(k!==i){const f=M[k][i];for(let j=i;j<=n;j++)M[k][j]-=f*M[i][j]}
+  }
+  return M.map(r=>r[n]);
+}
+function computeHomography(src,dst){
+  const A=[],b=[];
+  for(let i=0;i<4;i++){
+    const [x,y]=src[i],[u,v]=dst[i];
+    A.push([x,y,1,0,0,0,-u*x,-u*y]);b.push(u);
+    A.push([0,0,0,x,y,1,-v*x,-v*y]);b.push(v);
+  }
+  return solveLinear(A,b);
+}
+$('calibBtn').onclick=()=>{
+  calibrationMode=true;calibPts=[];H=null;
+  $('calibHint').style.display='block';$('calibState').textContent='Em andamento';$('mapMode').textContent='Calibrando…';
+  drawCalibration();
+};
+canvas.addEventListener('pointerdown',e=>{
+  if(!calibrationMode)return;
+  const r=canvas.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width*canvas.width, y=(e.clientY-r.top)/r.height*canvas.height;
+  calibPts.push([x,y]);drawCalibration();
+  if(calibPts.length===4){
+    H=computeHomography(calibPts,[[0,0],[100,0],[100,100],[0,100]]);
+    calibrationMode=false;$('calibHint').style.display='none';
+    $('calibState').textContent=H?'Sim':'Falhou';$('mapMode').textContent=H?'Homografia calibrada':'Aproximado';
+    if(!H)alert('Não foi possível calibrar. Tente marcar os quatro cantos novamente.');
+  }
+});
+function drawCalibration(){
+  if(!calibrationMode&&calibPts.length===0)return;
+  ctx.save();ctx.lineWidth=Math.max(3,canvas.width/420);ctx.strokeStyle='#00e5ff';ctx.fillStyle='#00e5ff';
+  calibPts.forEach((p,i)=>{
+    ctx.beginPath();ctx.arc(p[0],p[1],Math.max(7,canvas.width/140),0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#061018';ctx.fillText(String(i+1),p[0]-4,p[1]+5);ctx.fillStyle='#00e5ff';
+  });
+  if(calibPts.length>1){ctx.beginPath();ctx.moveTo(...calibPts[0]);for(let i=1;i<calibPts.length;i++)ctx.lineTo(...calibPts[i]);ctx.stroke()}
+  ctx.restore();
+}
+video.addEventListener('loadedmetadata',resizeCanvas);
+window.addEventListener('resize',()=>{});
+</script>
+</body>
+</html>
